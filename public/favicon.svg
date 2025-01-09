@@ -1,5 +1,24 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg width="512" height="512" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-    <path fill="#2563eb" d="M10.5 17h3v-2.5H16v-3h-2.5V9h-3v2.5H8v3h2.5z"/>
-    <path fill="#2563eb" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10s10-4.48 10-10S17.52 2 12 2m0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8s8 3.59 8 8s-3.59 8-8 8"/>
+<svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+    <!-- Outer hexagon (blockchain) -->
+    <path fill="#2563eb" d="M16 2l12 7v14l-12 7-12-7V9l12-7z" opacity="0.9"/>
+    
+    <!-- Inner medical cross -->
+    <g transform="translate(8,8)">
+        <!-- Vertical line -->
+        <rect x="7" y="2" width="2" height="12" fill="white"/>
+        <!-- Horizontal line -->
+        <rect x="2" y="7" width="12" height="2" fill="white"/>
+    </g>
+    
+    <!-- Connecting dots (blockchain nodes) -->
+    <circle cx="4" cy="16" r="1.5" fill="white"/>
+    <circle cx="28" cy="16" r="1.5" fill="white"/>
+    <circle cx="16" cy="4" r="1.5" fill="white"/>
+    <circle cx="16" cy="28" r="1.5" fill="white"/>
+    
+    <!-- Connecting lines -->
+    <path fill="none" stroke="white" stroke-width="1" 
+          d="M4,16 L28,16 M16,4 L16,28" 
+          opacity="0.6"/>
 </svg>
