@@ -1,5 +1,3 @@
-
-
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
@@ -9,8 +7,11 @@ import Navigation from '../components/Navigation';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'Healthcare Blockchain',
-  description: 'A blockchain-based healthcare management system',
+  title: 'MediChain Healthcare',
+  description: 'A secure and transparent healthcare records management system built on the Avalanche blockchain.',
+  icons: {
+    icon: '/favicon.svg',
+  },
 };
 
 export default function RootLayout({
