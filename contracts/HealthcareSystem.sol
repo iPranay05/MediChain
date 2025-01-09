@@ -31,12 +31,14 @@ contract HealthcareSystem {
     }
 
     struct Prescription {
+        uint256 id;
+        string patientAadhar;
         string diagnosis;
-        string medication;
-        string dosage;
+        string medicines;  // JSON string containing array of medicines
         string notes;
         uint256 timestamp;
         address hospital;
+        string hospitalName;  // Added hospital name field
     }
 
     struct Appointment {
@@ -76,7 +78,8 @@ contract HealthcareSystem {
     }
 
     // Mappings
-    mapping(string => Prescription[]) private prescriptions;
+    mapping(string => Prescription[]) private patientPrescriptions;
+    Prescription[] private allPrescriptions;
     mapping(string => uint256) public healthCoins;
     mapping(address => bool) public registeredHospitals;
     mapping(address => Doctor) public doctors;
@@ -104,7 +107,7 @@ contract HealthcareSystem {
     event AccessLogAdded(string indexed patientAadhar, address indexed accessor, string action);
     event PatientRegistered(string indexed aadharNumber);
     event DoctorRegistered(address indexed doctor, string name, string specialization);
-    event PrescriptionAdded(string indexed aadharNumber, address hospital);
+    event PrescriptionAdded(uint256 indexed prescriptionId, string indexed aadharNumber, address indexed hospital);
     event HealthCoinsAwarded(string indexed aadharNumber, uint256 amount);
     event HealthCoinsRedeemed(string indexed aadharNumber, uint256 amount);
     event AppointmentScheduled(uint256 indexed appointmentId, string patientAadhar, address doctor);
@@ -291,34 +294,44 @@ contract HealthcareSystem {
     }
 
     function addPrescription(
-        string memory _aadharNumber,
+        string memory _patientAadhar,
         string memory _diagnosis,
-        string memory _medication,
-        string memory _dosage,
-        string memory _notes
-    ) external {
+        string memory _medicines,  // JSON string containing array of medicines
+        string memory _notes,
+        string memory _hospitalName  // Added hospital name parameter
+    ) external onlyAuthorized(_patientAadhar, AccessLevel.WRITE) {
+        require(bytes(_patientAadhar).length > 0, "Invalid patient Aadhar");
+        require(bytes(_diagnosis).length > 0, "Invalid diagnosis");
+        require(bytes(_medicines).length > 0, "Invalid medicines data");
+
+        uint256 prescriptionId = allPrescriptions.length + 1;
+        
         Prescription memory newPrescription = Prescription({
+            id: prescriptionId,
+            patientAadhar: _patientAadhar,
             diagnosis: _diagnosis,
-            medication: _medication,
-            dosage: _dosage,
+            medicines: _medicines,
             notes: _notes,
             timestamp: block.timestamp,
-            hospital: msg.sender
+            hospital: msg.sender,
+            hospitalName: _hospitalName  // Added hospital name
         });
-
-        prescriptions[_aadharNumber].push(newPrescription);
-        healthCoins[_aadharNumber] += 100;
-
-        emit PrescriptionAdded(_aadharNumber, msg.sender);
-        emit HealthCoinsAwarded(_aadharNumber, 100);
+        
+        patientPrescriptions[_patientAadhar].push(newPrescription);
+        allPrescriptions.push(newPrescription);
+        
+        // Award health coins
+        healthCoins[_patientAadhar] += 10;
+        
+        emit PrescriptionAdded(prescriptionId, _patientAadhar, msg.sender);
     }
 
-    function getPrescriptions(string memory _aadharNumber) 
-        external 
-        view 
-        returns (Prescription[] memory) 
-    {
-        return prescriptions[_aadharNumber];
+    function getAllPrescriptions() external view returns (Prescription[] memory) {
+        return allPrescriptions;
+    }
+
+    function getPrescriptions(string memory _patientAadhar) external view returns (Prescription[] memory) {
+        return patientPrescriptions[_patientAadhar];
     }
 
     function scheduleAppointment(
