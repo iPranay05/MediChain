@@ -4,7 +4,9 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useWeb3 } from '@/context/Web3Context';
 import Link from 'next/link';
-import { Appointment } from '../../types/Appointment'; // Adjust the import path accordingly
+import Layout from '@/components/Layout';
+import { SignedIn } from '@clerk/nextjs';
+import { BsArrowLeft, BsCalendar, BsClock, BsEnvelope, BsTelephone, BsJournal, BsHospital } from 'react-icons/bs';
 
 enum AppointmentStatus {
   SCHEDULED = 0,
@@ -38,8 +40,6 @@ export default function Appointments() {
   const [notes, setNotes] = useState('');
   const [department, setDepartment] = useState('General');
 
-  const [myAppointments, setMyAppointments] = useState<Appointment[]>([]);
-
   const { contract, connectWallet, isConnected, account } = useWeb3();
 
   const departments = [
@@ -56,20 +56,10 @@ export default function Appointments() {
     'Urology'
   ];
 
-  const validateAadhar = (aadhar: string) => {
-    const aadharRegex = /^\d{12}$/;
-    return aadharRegex.test(aadhar);
-  };
-
-  const validateEmail = (email: string) => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
-  };
-
-  const validatePhone = (phone: string) => {
-    const phoneRegex = /^\d{10}$/;
-    return phoneRegex.test(phone);
-  };
+  // Validation functions
+  const validateAadhar = (aadhar: string) => /^\d{12}$/.test(aadhar);
+  const validateEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  const validatePhone = (phone: string) => /^\d{10}$/.test(phone);
 
   const fetchAppointments = async () => {
     if (!contract || !aadharNumber) return;
@@ -99,16 +89,15 @@ export default function Appointments() {
       return;
     }
 
+    // Validate all fields
     if (!validateAadhar(aadharNumber)) {
       setError('Please enter a valid 12-digit Aadhar number');
       return;
     }
-
     if (!validateEmail(contactEmail)) {
       setError('Please enter a valid email address');
       return;
     }
-
     if (!validatePhone(contactPhone)) {
       setError('Please enter a valid 10-digit phone number');
       return;
@@ -149,39 +138,13 @@ export default function Appointments() {
     }
   };
 
-  const handleStatusChange = async (appointmentId: number, newStatus: AppointmentStatus) => {
-    try {
-      if (!contract) {
-        throw new Error('Contract not initialized');
-      }
-
-      setLoading(true);
-      console.log('Updating appointment status:', { appointmentId, newStatus });
-      const tx = await contract.updateAppointmentStatus(appointmentId, newStatus);
-      await tx.wait();
-      
-      setSuccess('Appointment status updated successfully');
-      await fetchAppointments();
-    } catch (err: any) {
-      console.error('Error updating appointment status:', err);
-      setError(err.message || 'Error updating appointment status');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const getStatusText = (status: AppointmentStatus) => {
     switch (status) {
-      case AppointmentStatus.SCHEDULED:
-        return 'Scheduled';
-      case AppointmentStatus.CONFIRMED:
-        return 'Confirmed';
-      case AppointmentStatus.CANCELLED:
-        return 'Cancelled';
-      case AppointmentStatus.COMPLETED:
-        return 'Completed';
-      default:
-        return 'Unknown';
+      case AppointmentStatus.SCHEDULED: return 'Scheduled';
+      case AppointmentStatus.CONFIRMED: return 'Confirmed';
+      case AppointmentStatus.CANCELLED: return 'Cancelled';
+      case AppointmentStatus.COMPLETED: return 'Completed';
+      default: return 'Unknown';
     }
   };
 
@@ -191,398 +154,234 @@ export default function Appointments() {
         return 'bg-green-100 text-green-800 border-green-500';
       case AppointmentStatus.CANCELLED:
         return 'bg-red-100 text-red-800 border-red-500';
+      case AppointmentStatus.COMPLETED:
+        return 'bg-blue-100 text-blue-800 border-blue-500';
       default:
         return 'bg-yellow-100 text-yellow-800 border-yellow-500';
     }
   };
 
-  useEffect(() => {
-    if (contract && account) {
-      fetchMyAppointments();
-    }
-  }, [contract, account]);
-
-  const fetchMyAppointments = async () => {
-    try {
-      setLoading(true);
-      const appointments = await contract.getAppointmentsByPatient(account);
-      setMyAppointments(appointments);
-    } catch (error) {
-      console.error('Error fetching appointments:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const AppointmentCard: React.FC<{ appointment: Appointment }> = ({ appointment }) => (
-    <>
-      <div className="flex justify-between items-center mb-4">
-        <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-          appointment.status === AppointmentStatus.CONFIRMED
-            ? 'bg-green-100 text-green-800'
-            : appointment.status === AppointmentStatus.CANCELLED
-            ? 'bg-red-100 text-red-800'
-            : 'bg-yellow-100 text-yellow-800'
-        }`}>
-          {getStatusText(appointment.status)}
-        </span>
-      </div>
-
-      {/* Department and Time */}
-      <div className="mb-4">
-        <div className="flex items-center mb-2">
-          <svg className="w-5 h-5 text-blue-500 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-          </svg>
-          <span className="text-lg font-semibold">{appointment.department}</span>
-        </div>
-        <div className="flex items-center text-gray-600">
-          <svg className="w-5 h-5 text-blue-500 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-          </svg>
-          <span>
-            {new Date(appointment.timestamp * 1000).toLocaleDateString('en-US', {
-              weekday: 'long',
-              year: 'numeric',
-              month: 'long',
-              day: 'numeric',
-            })}
-          </span>
-        </div>
-        <div className="flex items-center text-gray-600 mt-1">
-          <svg className="w-5 h-5 text-blue-500 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          <span>
-            {new Date(appointment.timestamp * 1000).toLocaleTimeString('en-US', {
-              hour: '2-digit',
-              minute: '2-digit',
-            })}
-          </span>
-        </div>
-      </div>
-
-      {/* Contact Information */}
-      <div className="space-y-2 mb-4">
-        <div className="flex items-center text-gray-600">
-          <svg className="w-5 h-5 text-blue-500 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-          </svg>
-          <span>{appointment.contactEmail}</span>
-        </div>
-        <div className="flex items-center text-gray-600">
-          <svg className="w-5 h-5 text-blue-500 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-          </svg>
-          <span>{appointment.contactPhone}</span>
-        </div>
-      </div>
-
-      {/* Notes */}
-      {appointment.notes && (
-        <div className="mt-4 p-4 bg-gray-50 rounded-lg">
-          <div className="flex items-start">
-            <svg className="w-5 h-5 text-blue-500 mr-3 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-            <p className="text-gray-600">{appointment.notes}</p>
-          </div>
-        </div>
-      )}
-    </>
-  );
-
   return (
-    <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-7xl mx-auto">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="bg-white p-8 rounded-xl shadow-lg"
-        >
-          <div className="flex justify-between items-center mb-8">
-            <h2 className="text-3xl font-bold text-gray-900">Schedule an Appointment</h2>
-            <Link
-              href="/patient"
-              className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700"
-            >
-              Back to Patient Portal
-            </Link>
+    <SignedIn>
+      <Layout>
+        <div className="max-w-4xl mx-auto px-4 py-8">
+          {/* Header */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+            <div className="flex items-center justify-between mb-6">
+              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Schedule an Appointment</h1>
+              <Link 
+                href="/patient"
+                className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                <BsArrowLeft className="mr-2" />
+                Back to Portal
+              </Link>
+            </div>
+            
+            {error && (
+              <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-6">
+                <p className="text-red-700">{error}</p>
+              </div>
+            )}
+            
+            {success && (
+              <div className="bg-green-50 border-l-4 border-green-500 p-4 mb-6">
+                <p className="text-green-700">{success}</p>
+              </div>
+            )}
+
+            <form onSubmit={handleScheduleAppointment} className="space-y-6">
+              {/* Aadhar Number */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Aadhar Number
+                  </label>
+                  <input
+                    type="text"
+                    value={aadharNumber}
+                    onChange={(e) => setAadharNumber(e.target.value)}
+                    placeholder="Enter 12-digit Aadhar number"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    maxLength={12}
+                  />
+                </div>
+
+                {/* Department */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <span className="flex items-center">
+                      <BsHospital className="mr-2" />
+                      Department
+                    </span>
+                  </label>
+                  <select
+                    value={department}
+                    onChange={(e) => setDepartment(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    {departments.map((dept) => (
+                      <option key={dept} value={dept}>{dept}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Date and Time */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <span className="flex items-center">
+                      <BsCalendar className="mr-2" />
+                      Date
+                    </span>
+                  </label>
+                  <input
+                    type="date"
+                    value={appointmentDate}
+                    onChange={(e) => setAppointmentDate(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <span className="flex items-center">
+                      <BsClock className="mr-2" />
+                      Time
+                    </span>
+                  </label>
+                  <input
+                    type="time"
+                    value={appointmentTime}
+                    onChange={(e) => setAppointmentTime(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+              </div>
+
+              {/* Contact Information */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <span className="flex items-center">
+                      <BsEnvelope className="mr-2" />
+                      Contact Email
+                    </span>
+                  </label>
+                  <input
+                    type="email"
+                    value={contactEmail}
+                    onChange={(e) => setContactEmail(e.target.value)}
+                    placeholder="Enter your email address"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <span className="flex items-center">
+                      <BsTelephone className="mr-2" />
+                      Contact Phone
+                    </span>
+                  </label>
+                  <input
+                    type="tel"
+                    value={contactPhone}
+                    onChange={(e) => setContactPhone(e.target.value)}
+                    placeholder="Enter 10-digit phone number"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    maxLength={10}
+                  />
+                </div>
+              </div>
+
+              {/* Notes */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <span className="flex items-center">
+                    <BsJournal className="mr-2" />
+                    Notes
+                  </span>
+                </label>
+                <textarea
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="Any additional notes or concerns..."
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  rows={4}
+                />
+              </div>
+
+              {/* Submit Button */}
+              <div className="flex justify-end">
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className={`px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center ${
+                    loading ? 'opacity-50 cursor-not-allowed' : ''
+                  }`}
+                >
+                  {loading ? (
+                    <>
+                      <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Processing...
+                    </>
+                  ) : (
+                    'Schedule Appointment'
+                  )}
+                </button>
+              </div>
+            </form>
           </div>
 
-          {!isConnected ? (
-            <div className="text-center mb-8">
-              <button
-                onClick={connectWallet}
-                className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700"
-              >
-                Connect Wallet
-              </button>
-            </div>
-          ) : (
-            <>
-              <div className="text-center mb-4 text-sm text-gray-600">
-                Connected Account: {account}
-              </div>
-
-              {error && (
-                <div className="bg-red-50 text-red-700 p-4 rounded-md mb-6">
-                  {error}
-                </div>
-              )}
-
-              {success && (
-                <div className="bg-green-50 text-green-700 p-4 rounded-md mb-6">
-                  {success}
-                </div>
-              )}
-
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                {/* Schedule Appointment Form */}
-                <div className="lg:col-span-2">
-                  <h3 className="text-xl font-semibold mb-4">Schedule an Appointment</h3>
-                  <form onSubmit={handleScheduleAppointment} className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Appointments List */}
+          {appointments.length > 0 && (
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+              <h2 className="text-xl font-semibold mb-4">Your Appointments</h2>
+              <div className="space-y-4">
+                {appointments.map((appointment) => (
+                  <motion.div
+                    key={appointment.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className={`p-4 rounded-lg border ${getStatusColor(appointment.status)}`}
+                  >
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-sm font-medium text-gray-700">
-                          Aadhar Number
-                        </label>
-                        <input
-                          type="text"
-                          pattern="\d{12}"
-                          maxLength={12}
-                          required
-                          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                          value={aadharNumber}
-                          onChange={(e) => {
-                            const value = e.target.value.replace(/\D/g, '').slice(0, 12);
-                            setAadharNumber(value);
-                            setError('');
-                          }}
-                          onBlur={fetchAppointments}
-                          placeholder="Enter 12-digit Aadhar number"
-                        />
+                        <p className="font-medium">Date & Time</p>
+                        <p>{new Date(appointment.timestamp * 1000).toLocaleString()}</p>
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700">
-                          Department
-                        </label>
-                        <select
-                          required
-                          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                          value={department}
-                          onChange={(e) => setDepartment(e.target.value)}
-                        >
-                          {departments.map((dept) => (
-                            <option key={dept} value={dept}>
-                              {dept}
-                            </option>
-                          ))}
-                        </select>
+                        <p className="font-medium">Department</p>
+                        <p>{appointment.department}</p>
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700">
-                          Date
-                        </label>
-                        <input
-                          type="date"
-                          required
-                          min={new Date().toISOString().split('T')[0]}
-                          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                          value={appointmentDate}
-                          onChange={(e) => setAppointmentDate(e.target.value)}
-                        />
+                        <p className="font-medium">Status</p>
+                        <p>{getStatusText(appointment.status)}</p>
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700">
-                          Time
-                        </label>
-                        <input
-                          type="time"
-                          required
-                          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                          value={appointmentTime}
-                          onChange={(e) => setAppointmentTime(e.target.value)}
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700">
-                          Contact Email
-                        </label>
-                        <input
-                          type="email"
-                          required
-                          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                          value={contactEmail}
-                          onChange={(e) => setContactEmail(e.target.value)}
-                          placeholder="Enter your email address"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700">
-                          Contact Phone
-                        </label>
-                        <input
-                          type="tel"
-                          pattern="\d{10}"
-                          maxLength={10}
-                          required
-                          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                          value={contactPhone}
-                          onChange={(e) => {
-                            const value = e.target.value.replace(/\D/g, '').slice(0, 10);
-                            setContactPhone(value);
-                          }}
-                          placeholder="Enter 10-digit phone number"
-                        />
-                      </div>
-                      <div className="md:col-span-2">
-                        <label className="block text-sm font-medium text-gray-700">
-                          Notes
-                        </label>
-                        <textarea
-                          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                          value={notes}
-                          onChange={(e) => setNotes(e.target.value)}
-                          placeholder="Add any notes or symptoms"
-                          rows={3}
-                        />
+                        <p className="font-medium">Contact</p>
+                        <p>{appointment.contactEmail}</p>
+                        <p>{appointment.contactPhone}</p>
                       </div>
                     </div>
-                    <button
-                      type="submit"
-                      disabled={loading || !isConnected}
-                      className="w-full bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 disabled:bg-gray-400"
-                    >
-                      Schedule Appointment
-                    </button>
-                  </form>
-                </div>
-
-                {/* Appointments List */}
-                {appointments.length > 0 && (
-                  <div className="lg:col-span-2">
-                    <h3 className="text-xl font-semibold mb-4">Your Appointments</h3>
-                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                      {appointments.map((appointment, index) => (
-                        <div
-                          key={index}
-                          className="bg-gray-50 p-4 rounded-lg border border-gray-200"
-                        >
-                          <p><strong>Department:</strong> {appointment.department}</p>
-                          <p><strong>Date & Time:</strong> {new Date(appointment.timestamp * 1000).toLocaleString()}</p>
-                          <p><strong>Contact:</strong></p>
-                          <p className="ml-4">Email: {appointment.contactEmail}</p>
-                          <p className="ml-4">Phone: {appointment.contactPhone}</p>
-                          <p><strong>Notes:</strong> {appointment.notes}</p>
-                          <p><strong>Status:</strong> {getStatusText(appointment.status)}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* My Appointments Section */}
-              <div className="mt-12">
-                <h3 className="text-2xl font-bold text-gray-900 mb-6">Your Appointments</h3>
-                {loading ? (
-                  <div className="text-center py-4">Loading your appointments...</div>
-                ) : myAppointments.length > 0 ? (
-                  <div className="space-y-8">
-                    {/* Pending Appointments */}
-                    <div>
-                      <h4 className="text-lg font-semibold text-gray-700 mb-4 flex items-center">
-                        <svg className="w-5 h-5 text-yellow-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        Pending Appointments
-                      </h4>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {myAppointments
-                          .filter(appointment => appointment.status === AppointmentStatus.SCHEDULED)
-                          .map((appointment, index) => (
-                            <div 
-                              key={`pending-${index}`}
-                              className="bg-white p-6 rounded-xl shadow-lg hover:shadow-xl transition-shadow duration-300 border-l-4 border-yellow-500"
-                            >
-                              <AppointmentCard appointment={appointment} />
-                            </div>
-                          ))}
-                        {myAppointments.filter(appointment => appointment.status === AppointmentStatus.SCHEDULED).length === 0 && (
-                          <div className="col-span-2 text-center py-6 bg-gray-50 rounded-lg">
-                            <p className="text-gray-500">No pending appointments</p>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Confirmed Appointments */}
-                    <div>
-                      <h4 className="text-lg font-semibold text-gray-700 mb-4 flex items-center">
-                        <svg className="w-5 h-5 text-green-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        Confirmed Appointments
-                      </h4>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {myAppointments
-                          .filter(appointment => appointment.status === AppointmentStatus.CONFIRMED)
-                          .map((appointment, index) => (
-                            <div 
-                              key={`confirmed-${index}`}
-                              className="bg-white p-6 rounded-xl shadow-lg hover:shadow-xl transition-shadow duration-300 border-l-4 border-green-500"
-                            >
-                              <AppointmentCard appointment={appointment} />
-                            </div>
-                          ))}
-                        {myAppointments.filter(appointment => appointment.status === AppointmentStatus.CONFIRMED).length === 0 && (
-                          <div className="col-span-2 text-center py-6 bg-gray-50 rounded-lg">
-                            <p className="text-gray-500">No confirmed appointments</p>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Cancelled Appointments - Optionally show these */}
-                    {myAppointments.some(appointment => appointment.status === AppointmentStatus.CANCELLED) && (
-                      <div>
-                        <h4 className="text-lg font-semibold text-gray-700 mb-4 flex items-center">
-                          <svg className="w-5 h-5 text-red-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                          </svg>
-                          Cancelled Appointments
-                        </h4>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                          {myAppointments
-                            .filter(appointment => appointment.status === AppointmentStatus.CANCELLED)
-                            .map((appointment, index) => (
-                              <div 
-                                key={`cancelled-${index}`}
-                                className="bg-white p-6 rounded-xl shadow-lg hover:shadow-xl transition-shadow duration-300 border-l-4 border-red-500"
-                              >
-                                <AppointmentCard appointment={appointment} />
-                              </div>
-                            ))}
-                        </div>
+                    {appointment.notes && (
+                      <div className="mt-4">
+                        <p className="font-medium">Notes</p>
+                        <p className="text-gray-600">{appointment.notes}</p>
                       </div>
                     )}
-                  </div>
-                ) : (
-                  <div className="text-center py-8 bg-gray-50 rounded-lg">
-                    <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-                    <h3 className="mt-2 text-sm font-medium text-gray-900">No appointments</h3>
-                    <p className="mt-1 text-sm text-gray-500">You don't have any scheduled appointments yet.</p>
-                  </div>
-                )}
+                  </motion.div>
+                ))}
               </div>
-            </>
+            </div>
           )}
-        </motion.div>
-      </div>
-    </div>
+        </div>
+      </Layout>
+    </SignedIn>
   );
 }

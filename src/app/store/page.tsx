@@ -1,7 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import Layout from '@/components/Layout';
+import { useState, useEffect } from 'react';
+import { SignedIn } from '@clerk/nextjs';
 import { motion } from 'framer-motion';
+import { useWeb3 } from '@/context/Web3Context';
+import { BsCoin, BsWallet2 } from 'react-icons/bs';
 
 interface StoreItem {
   id: number;
@@ -11,13 +15,25 @@ interface StoreItem {
   discountPrice: number;
   coinsRequired: number;
   image: string;
+  category: string;
 }
 
-export default function Store() {
+export default function StorePage() {
   const [aadharNumber, setAadharNumber] = useState('');
+  const [activeTab, setActiveTab] = useState('all');
   const [healthCoins, setHealthCoins] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [checkingBalance, setCheckingBalance] = useState(false);
+  const { contract, account, isConnected, connectWallet } = useWeb3();
+
+  const categories = [
+    { id: 'all', name: 'All Items' },
+    { id: 'checkups', name: 'Health Checkups' },
+    { id: 'dental', name: 'Dental Care' },
+    { id: 'pharmacy', name: 'Pharmacy' },
+    { id: 'wellness', name: 'Wellness' }
+  ];
 
   const storeItems: StoreItem[] = [
     {
@@ -27,7 +43,8 @@ export default function Store() {
       originalPrice: 8000,
       discountPrice: 6000,
       coinsRequired: 150,
-      image: '🏥'
+      image: '/health-checkup.png',
+      category: 'checkups'
     },
     {
       id: 2,
@@ -36,7 +53,8 @@ export default function Store() {
       originalPrice: 5000,
       discountPrice: 3500,
       coinsRequired: 100,
-      image: '🦷'
+      image: '/dental-care.jpg',
+      category: 'dental'
     },
     {
       id: 3,
@@ -45,7 +63,8 @@ export default function Store() {
       originalPrice: 4000,
       discountPrice: 3000,
       coinsRequired: 80,
-      image: '👁️'
+      image: '/vision-care.png',
+      category: 'wellness'
     },
     {
       id: 4,
@@ -54,7 +73,8 @@ export default function Store() {
       originalPrice: 2000,
       discountPrice: 1500,
       coinsRequired: 50,
-      image: '💊'
+      image: '/pharmacy-discount.png',
+      category: 'pharmacy'
     },
     {
       id: 5,
@@ -63,7 +83,8 @@ export default function Store() {
       originalPrice: 6000,
       discountPrice: 4500,
       coinsRequired: 120,
-      image: '🧘'
+      image: '/wellness-package.png',
+      category: 'wellness'
     },
     {
       id: 6,
@@ -72,7 +93,8 @@ export default function Store() {
       originalPrice: 4500,
       discountPrice: 3200,
       coinsRequired: 90,
-      image: '🔬'
+      image: '/lab-test.png',
+      category: 'checkups'
     },
     {
       id: 7,
@@ -81,7 +103,8 @@ export default function Store() {
       originalPrice: 3500,
       discountPrice: 2500,
       coinsRequired: 70,
-      image: '💆'
+      image: '/physiotherapy.png',
+      category: 'wellness'
     },
     {
       id: 8,
@@ -90,7 +113,8 @@ export default function Store() {
       originalPrice: 4500,
       discountPrice: 3500,
       coinsRequired: 100,
-      image: '🧠'
+      image: '/mental-health.png',
+      category: 'wellness'
     },
     {
       id: 9,
@@ -99,7 +123,8 @@ export default function Store() {
       originalPrice: 3000,
       discountPrice: 2200,
       coinsRequired: 60,
-      image: '💉'
+      image: '/vaccination.png',
+      category: 'pharmacy'
     },
     {
       id: 10,
@@ -108,7 +133,8 @@ export default function Store() {
       originalPrice: 2500,
       discountPrice: 1800,
       coinsRequired: 45,
-      image: '🥗'
+      image: '/nutrition-consultation.png',
+      category: 'wellness'
     },
     {
       id: 11,
@@ -117,7 +143,8 @@ export default function Store() {
       originalPrice: 7000,
       discountPrice: 5500,
       coinsRequired: 140,
-      image: '📷'
+      image: '/diagnostic-imaging.png',
+      category: 'checkups'
     },
     {
       id: 12,
@@ -126,162 +153,230 @@ export default function Store() {
       originalPrice: 5000,
       discountPrice: 3800,
       coinsRequired: 110,
-      image: '🚑'
+      image: '/emergency-care.png',
+      category: 'pharmacy'
     }
   ];
 
-  const handleCheckBalance = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError('');
+  const handleCheckBalance = async () => {
+    if (!aadharNumber) {
+      setError('Please enter your Aadhar number');
+      return;
+    }
+
+    if (!isConnected) {
+      try {
+        await connectWallet();
+      } catch (err) {
+        setError('Failed to connect wallet. Please make sure MetaMask is installed and try again.');
+        return;
+      }
+    }
+
+    if (!contract) {
+      setError('Please connect your wallet first');
+      return;
+    }
 
     try {
-      // Here we'll add the logic to fetch health coins balance from blockchain
-      // This will be implemented once we deploy the smart contract
-      setHealthCoins(100);
-    } catch (err: any) {
-      setError(err.message);
+      setCheckingBalance(true);
+      setError('');
+      const balance = await contract.getHealthCoins(aadharNumber);
+      setHealthCoins(Number(balance));
+    } catch (err) {
+      console.error('Error checking balance:', err);
+      setError('Failed to fetch balance. Please make sure you are connected to Avalanche Fuji Testnet.');
+    } finally {
+      setCheckingBalance(false);
+    }
+  };
+
+  const handleRedeem = async (item: StoreItem) => {
+    if (!isConnected || !contract) {
+      setError('Please connect your wallet first');
+      return;
+    }
+
+    if (!aadharNumber) {
+      setError('Please enter your Aadhar number first');
+      return;
+    }
+
+    if (healthCoins < item.coinsRequired) {
+      setError(`You need ${item.coinsRequired - healthCoins} more coins to redeem this item`);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError('');
+      const tx = await contract.redeemHealthCoins(aadharNumber, item.coinsRequired);
+      await tx.wait();
+      
+      // Update balance after redemption
+      const newBalance = await contract.getHealthCoins(aadharNumber);
+      setHealthCoins(Number(newBalance));
+      
+      alert('Successfully redeemed! Your discount code will be sent to your registered mobile number.');
+    } catch (err) {
+      console.error('Error redeeming coins:', err);
+      setError('Failed to redeem coins. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleRedeem = async (item: StoreItem) => {
-    if (healthCoins < item.coinsRequired) {
-      setError('Insufficient health coins');
-      return;
-    }
-
-    try {
-      // Here we'll add the logic to redeem health coins
-      // This will be implemented once we deploy the smart contract
-      alert('Successfully redeemed! Your discount code will be sent to your registered mobile number.');
-    } catch (err: any) {
-      setError(err.message);
-    }
-  };
-
   return (
-    <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-6xl mx-auto">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="bg-white p-8 rounded-xl shadow-lg"
-        >
-          <div className="text-center mb-8">
-            <h2 className="text-3xl font-bold text-gray-900">Health Store</h2>
-            <p className="mt-2 text-gray-600">Redeem your Health Coins for exclusive healthcare benefits</p>
-          </div>
-
-          <form onSubmit={handleCheckBalance} className="max-w-md mx-auto mb-8">
-            <div className="flex gap-4">
+    <main className="min-h-screen bg-gray-50 pt-20">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 mb-4 sm:mb-0">Health Store</h1>
+          
+          <div className="w-full sm:w-auto flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
+            <div className="flex-1 sm:flex-initial">
               <input
                 type="text"
-                pattern="[0-9]{12}"
-                required
-                className="flex-1 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                 value={aadharNumber}
-                onChange={(e) => setAadharNumber(e.target.value)}
-                placeholder="Enter your 12-digit Aadhar number"
+                onChange={(e) => {
+                  setError('');
+                  setAadharNumber(e.target.value.replace(/\D/g, '').slice(0, 12));
+                }}
+                placeholder="Enter Aadhar Number"
+                className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                maxLength={12}
               />
+            </div>
+            
+            {!isConnected && (
               <button
-                type="submit"
-                disabled={loading}
-                className={`px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${
-                  loading ? 'opacity-50 cursor-not-allowed' : ''
-                }`}
+                onClick={connectWallet}
+                className="flex items-center justify-center px-6 py-2 rounded-lg bg-green-600 text-white font-medium hover:bg-green-700 transition-all"
               >
-                {loading ? 'Checking...' : 'Check Balance'}
+                <BsWallet2 className="mr-2" />
+                Connect Wallet
               </button>
-            </div>
-          </form>
-
-          {error && (
-            <div className="bg-red-50 text-red-700 p-4 rounded-md mb-6 max-w-md mx-auto">
-              <div className="flex items-center">
-                <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                </svg>
-                {error}
-              </div>
-            </div>
-          )}
-
-          {healthCoins > 0 && (
-            <div className="bg-green-50 p-4 rounded-md mb-6 max-w-md mx-auto">
-              <div className="flex items-center">
-                <svg className="w-5 h-5 text-green-600 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                </svg>
-                <div>
-                  <p className="text-green-700 font-medium">Your Health Coins Balance:</p>
-                  <p className="text-green-800 text-xl font-bold">{healthCoins} coins</p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Filter buttons */}
-          <div className="flex flex-wrap gap-2 mb-6 justify-center">
-            <button className="px-4 py-2 bg-blue-100 text-blue-700 rounded-full hover:bg-blue-200">
-              All Items
-            </button>
-            <button className="px-4 py-2 bg-gray-100 text-gray-700 rounded-full hover:bg-gray-200">
-              Health Checkups
-            </button>
-            <button className="px-4 py-2 bg-gray-100 text-gray-700 rounded-full hover:bg-gray-200">
-              Dental Care
-            </button>
-            <button className="px-4 py-2 bg-gray-100 text-gray-700 rounded-full hover:bg-gray-200">
-              Pharmacy
-            </button>
-            <button className="px-4 py-2 bg-gray-100 text-gray-700 rounded-full hover:bg-gray-200">
-              Wellness
+            )}
+            
+            <button
+              onClick={handleCheckBalance}
+              disabled={checkingBalance || !aadharNumber || (!isConnected && !contract)}
+              className={`flex items-center justify-center px-6 py-2 rounded-lg text-white font-medium transition-all ${
+                checkingBalance || !aadharNumber || (!isConnected && !contract)
+                  ? 'bg-gray-400 cursor-not-allowed'
+                  : 'bg-blue-600 hover:bg-blue-700'
+              }`}
+            >
+              {checkingBalance ? 'Checking...' : 'Check Balance'}
             </button>
           </div>
+        </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {storeItems.map((item) => (
+        {error && (
+          <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
+            {error}
+          </div>
+        )}
+
+        {isConnected && account && (
+          <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="flex items-center gap-2">
+              <BsWallet2 className="text-blue-600" />
+              <span className="text-sm text-blue-800">
+                Connected: {account.slice(0, 6)}...{account.slice(-4)}
+              </span>
+            </div>
+          </div>
+        )}
+
+        {healthCoins > 0 && (
+          <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+            <div className="flex items-center gap-2">
+              <BsCoin className="text-yellow-500 text-xl" />
+              <span className="text-lg font-semibold text-green-800">
+                Your Balance: {healthCoins} Health Coins
+              </span>
+            </div>
+          </div>
+        )}
+
+        <div className="flex overflow-x-auto space-x-4 mb-8 pb-2">
+          {categories.map((category) => (
+            <button
+              key={category.id}
+              onClick={() => setActiveTab(category.id)}
+              className={`px-4 py-2 rounded-full whitespace-nowrap transition-all ${
+                activeTab === category.id
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-white text-gray-600 hover:bg-gray-100'
+              }`}
+            >
+              {category.name}
+            </button>
+          ))}
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {storeItems
+            .filter((item) => activeTab === 'all' || item.category === activeTab)
+            .map((item) => (
               <motion.div
                 key={item.id}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, delay: item.id * 0.1 }}
-                className="bg-white p-6 rounded-lg shadow-sm hover:shadow-xl transition-all duration-300 border border-gray-100"
+                className="bg-white rounded-lg shadow-md overflow-hidden border border-gray-200 hover:shadow-lg transition-shadow"
               >
-                <div className="text-4xl mb-4 bg-blue-50 w-16 h-16 rounded-full flex items-center justify-center">
-                  {item.image}
+                <div className="aspect-w-16 aspect-h-9 bg-gray-100">
+                  <img
+                    src={item.image}
+                    alt={item.name}
+                    className="object-cover w-full h-48"
+                  />
                 </div>
-                <h3 className="text-lg font-semibold mb-2 text-gray-900">{item.name}</h3>
-                <p className="text-gray-600 text-sm mb-4 h-20">{item.description}</p>
-                <div className="space-y-2">
-                  <p className="text-gray-500 line-through">₹{item.originalPrice.toLocaleString()}</p>
-                  <p className="text-xl font-bold text-green-600">₹{item.discountPrice.toLocaleString()}</p>
-                  <div className="flex items-center text-blue-600">
-                    <svg className="w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                      <path d="M10 2a8 8 0 100 16 8 8 0 000-16zM8.5 12.5l-2-2 1.4-1.4 2 2 3.6-3.6 1.4 1.4-5 5z" />
-                    </svg>
-                    <p className="text-sm">{item.coinsRequired} Health Coins required</p>
+                <div className="p-4 space-y-4">
+                  <h3 className="text-lg font-semibold text-gray-900">{item.name}</h3>
+                  <p className="text-sm text-gray-600">{item.description}</p>
+                  
+                  <div className="flex items-baseline space-x-2">
+                    <span className="text-2xl font-bold text-blue-600">
+                      ₹{item.discountPrice.toLocaleString()}
+                    </span>
+                    <span className="text-sm text-gray-500 line-through">
+                      ₹{item.originalPrice.toLocaleString()}
+                    </span>
                   </div>
+
+                  <div className="flex items-center text-sm text-gray-600">
+                    <BsCoin className="text-yellow-500 mr-1" />
+                    <span>{item.coinsRequired} Health Coins required</span>
+                  </div>
+
+                  <button
+                    onClick={() => handleRedeem(item)}
+                    disabled={!isConnected || !contract || loading || healthCoins < item.coinsRequired}
+                    className={`w-full py-2 px-4 rounded-lg font-medium transition-all ${
+                      !isConnected || !contract
+                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                        : healthCoins < item.coinsRequired
+                        ? 'bg-gray-100 text-gray-600 cursor-not-allowed'
+                        : loading
+                        ? 'bg-blue-400 text-white cursor-wait'
+                        : 'bg-blue-600 text-white hover:bg-blue-700'
+                    }`}
+                  >
+                    {!isConnected || !contract
+                      ? 'Connect Wallet'
+                      : healthCoins < item.coinsRequired
+                      ? `Need ${item.coinsRequired - healthCoins} more coins`
+                      : loading
+                      ? 'Processing...'
+                      : 'Redeem Now'}
+                  </button>
                 </div>
-                <button
-                  onClick={() => handleRedeem(item)}
-                  disabled={healthCoins < item.coinsRequired}
-                  className={`mt-4 w-full py-2 px-4 rounded-md transition-all duration-300 ${
-                    healthCoins >= item.coinsRequired
-                      ? 'bg-green-600 text-white hover:bg-green-700'
-                      : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                  }`}
-                >
-                  {healthCoins >= item.coinsRequired ? 'Redeem Now' : `Need ${item.coinsRequired - healthCoins} more coins`}
-                </button>
               </motion.div>
             ))}
-          </div>
-        </motion.div>
+        </div>
       </div>
-    </div>
+    </main>
   );
 }
